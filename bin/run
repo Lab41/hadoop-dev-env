@@ -1,0 +1,66 @@
+#!/bin/sh
+
+set -e
+
+ROOT=`dirname $0`/..
+CDH=cdh4.4.0
+
+export PATH=$ROOT/$CDH/hadoop-2.0.0-$CDH/bin:$PATH
+export PATH=$ROOT/$CDH/hadoop-2.0.0-$CDH/sbin:$PATH
+#export PATH=$ROOT/$CDH/hadoop-2.0.0-$CDH/bin-mapreduce1:$PATH
+export PATH=$ROOT/$CDH/hbase-0.94.6-$CDH/bin:$PATH
+
+export HADOOP_HOME=$ROOT/$CDH/hadoop-2.0.0-$CDH
+export HADOOP_HDFS_HOME="$HADOOP_HOME"
+export HADOOP_MAPRED_HOME="$HADOOP_HOME"
+export HADOOP_YARN_HOME="$HADOOP_HOME"
+
+
+#export HADOOP_MAPRED_HOME=$ROOT/$CDH/hadoop-2.0.0-$CDH
+#export HADOOP_MAPRED_HOME=$ROOT/$CDH/hadoop-2.0.0-$CDH/share/hadoop/mapreduce1
+#export HADOOP_HOME=$ROOT/$CDH/hadoop-2.0.0-$CDH/share/hadoop/mapreduce1
+
+#export PATH=$ROOT/$CDH/hadoop-2.0.0-mr1-$CDH/bin:$PATH
+#export PATH=$ROOT/$CDH/hadoop-2.0.0-mr1-$CDH/sbin:$PATH
+#export PATH=$ROOT/$CDH/hive-0.9.0-$CDH/bin:$PATH
+#export PATH=$ROOT/$CDH/pig-0.10.0-$CDH/bin:$PATH
+#export PATH=$ROOT/$CDH/oozie-3.3.0-$CDH/bin:$PATH
+#export HADOOP_HOME=$ROOT/$CDH/hadoop-2.0.0-mr1-cdh4.2.0
+
+#export HADOOP_COMMON_HOME=$HADOOP_HOME
+#export HADOOP_HDFS_HOME=$HADOOP_HOME
+#export HADOOP_MAPRED_HOME=$HADOOP_HOME
+#export HADOOP_YARN_HOME=$HADOOP_HOME
+
+hadoop_conf=$1
+shift
+
+if [[ "$hadoop_conf" == "" ]]; then
+    echo "please enter the config" 1>&2
+    exit 1
+fi
+
+case "$hadoop_conf" in
+    local)
+        export HADOOP_CONF_DIR=$ROOT/conf/local/
+        ;;
+    vm)
+        export HADOOP_CONF_DIR=$ROOT/conf/vm/
+        ;;
+    mp)
+        export HADOOP_CONF_DIR=$ROOT/conf/mp/
+        ;;
+    *)
+        echo "unknown config $hadoop_conf" 1>&2
+        
+        ;;
+esac
+
+#unset HADOOP_CONF_DIR
+
+if [[ "$1" == "" ]]; then
+    echo "please specify a command to run" 1>&2
+    exit 1
+fi
+
+exec "$@"

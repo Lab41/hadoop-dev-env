@@ -1,0 +1,19 @@
+#!/bin/sh
+
+cd `dirname $0`
+
+set -e
+
+
+hadoop_conf=$1
+
+if [[ "$hadoop_conf" == "" ]]; then
+    echo "please enter the config" 1>&2
+    exit 1
+fi
+
+
+./run $hadoop_conf stop-hbase.sh
+./run $hadoop_conf yarn-daemon.sh stop resourcemanager
+./run $hadoop_conf yarn-daemon.sh stop nodemanager
+./run $hadoop_conf stop-dfs.sh
