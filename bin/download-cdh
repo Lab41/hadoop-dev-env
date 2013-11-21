@@ -1,0 +1,26 @@
+#!/bin/sh
+
+set -e
+
+cd `dirname $0`/..
+
+HADOOP=hadoop-2.0.0-cdh4.4.0.tar.gz
+HBASE=hbase-0.94.6-cdh4.4.0.tar.gz
+
+if [ ! -e downloads ]; then
+    mkdir -p downloads
+fi
+
+cd downloads
+
+curl -C - -O http://archive.cloudera.com/cdh4/cdh/4/$HADOOP
+curl -C - -O http://archive.cloudera.com/cdh4/cdh/4/$HBASE
+
+if [ ! -e cdh ]; then
+    mkdir -p cdh
+fi
+
+cd cdh
+
+tar -xvf ../downloads/$HADOOP
+tar -xvf ../downloads/$HBASE
