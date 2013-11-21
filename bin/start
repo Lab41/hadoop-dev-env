@@ -13,6 +13,5 @@ fi
 
 
 ./run $hadoop_conf start-dfs.sh
-./run $hadoop_conf yarn-daemon.sh start resourcemanager
-./run $hadoop_conf yarn-daemon.sh start nodemanager
+./run $hadoop_conf start-yarn.sh
 ./run $hadoop_conf start-hbase.sh
