@@ -26,12 +26,9 @@
         <value>yarn</value>
     </property>
 
-    <!--
     <property>
-        <name>mapreduce.cluster.temp.dir</name>
-        <value></value>
-        <description>No description</description>
-        <final>true</final>
+        <name>mapred.child.java.opts</name>
+        <value>-Xmx1024m</value>
     </property>
 
     <property>
