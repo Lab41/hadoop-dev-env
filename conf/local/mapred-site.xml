@@ -37,10 +37,13 @@
     </property>
 
     <property>
-        <name>mapreduce.cluster.local.dir</name>
-        <value></value>
-        <description>No description</description>
-        <final>true</final>
+        <name>mapreduce.jobtracker.jobhistory.location</name>
+        <value>hdfs:///mapreduce/logs</value>
     </property>
-    -->
+
+    <property>
+        <name>mapred.job.tracker.history.location</name>
+        <value>hdfs:///mapreduce/logs</value>
+    </property>
+
 </configuration>
