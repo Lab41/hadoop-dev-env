@@ -4,22 +4,20 @@
 <!-- Put site-specific property overrides in this file. -->
 
 <configuration>
-    <!--
     <property>
         <name>mapreduce.jobhistory.address</name>
-        <value>localhost:10020</value>
+        <value>127.0.0.1:10020</value>
     </property>
 
     <property>
         <name>mapreduce.jobhistory.webapp.address</name>
-        <value>localhost:19888</value>
+        <value>127.0.0.1:19888</value>
     </property>
--->
 
     <!--
     <property>
         <name>mapred.job.tracker</name>
-        <value>localhost:8021</value>
+        <value>127.0.0.1:8021</value>
     </property>
 -->
 

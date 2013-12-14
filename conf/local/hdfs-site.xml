@@ -21,12 +21,4 @@
         <name>dfs.replication</name>
         <value>1</value>
     </property>
-    <property>
-        <name>dfs.namenode.name.dir</name>
-        <value>file:///tmp/hadoop-${user.name}/namenode</value>
-    </property>
-    <property>
-        <name>dfs.datanode.data.dir</name>
-        <value>file:///tmp/hadoop-${user.name}/datanode</value>
-    </property>
 </configuration>
