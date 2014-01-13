@@ -16,6 +16,8 @@ cd downloads
 curl -C - -O http://archive.cloudera.com/cdh4/cdh/4/$HADOOP
 curl -C - -O http://archive.cloudera.com/cdh4/cdh/4/$HBASE
 
+cd ..
+
 if [ ! -e cdh ]; then
     mkdir -p cdh
 fi
