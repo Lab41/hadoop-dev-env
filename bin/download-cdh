@@ -4,8 +4,14 @@ set -e
 
 cd `dirname $0`/..
 
-HADOOP=hadoop-2.0.0-cdh4.4.0.tar.gz
-HBASE=hbase-0.94.6-cdh4.4.0.tar.gz
+CDH_MAJOR=5
+CDH_VERSION=cdh5.0.0-beta-2
+
+HADOOP=hadoop-2.2.0-$CDH_VERSION.tar.gz
+HBASE=hbase-0.96.1.1-$CDH_VERSION.tar.gz
+SEARCH=search-1.0.0-$CDH_VERSION.tar.gz
+SOLR=solr-4.4.0-$CDH_VERSION.tar.gz
+SPARK=spark-0.9.0-$CDH_VERSION.tar.gz
 
 if [ ! -e downloads ]; then
     mkdir -p downloads
@@ -13,16 +19,20 @@ fi
 
 cd downloads
 
-curl -C - -O http://archive.cloudera.com/cdh4/cdh/4/$HADOOP
-curl -C - -O http://archive.cloudera.com/cdh4/cdh/4/$HBASE
+curl -O \
+    http://archive.cloudera.com/cdh$CDH_MAJOR/cdh/$CDH_MAJOR/$HADOOP \
+    http://archive.cloudera.com/cdh$CDH_MAJOR/cdh/$CDH_MAJOR/$HBASE \
+    http://archive.cloudera.com/cdh$CDH_MAJOR/cdh/$CDH_MAJOR/$SEARCH \
+    http://archive.cloudera.com/cdh$CDH_MAJOR/cdh/$CDH_MAJOR/$SOLR \
+    http://archive.cloudera.com/cdh$CDH_MAJOR/cdh/$CDH_MAJOR/$SPARK
 
 cd ..
 
-if [ ! -e cdh ]; then
-    mkdir -p cdh
-fi
+mkdir -p cdh/$CDH_VERSION
+cd cdh/$CDH_VERSION
 
-cd cdh
-
-tar -xvf ../downloads/$HADOOP
-tar -xvf ../downloads/$HBASE
+tar -xvf ../../downloads/$HADOOP
+tar -xvf ../../downloads/$HBASE
+tar -xvf ../../downloads/$SEARCH
+tar -xvf ../../downloads/$SOLR
+tar -xvf ../../downloads/$SPARK

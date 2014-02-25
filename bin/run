@@ -13,6 +13,9 @@ if [[ "$hadoop_conf" == "" ]]; then
 fi
 
 case "$hadoop_conf" in
+    pseudo)
+        export HADOOP_CONF_DIR=$ROOT/conf/pseudo/
+        ;;
     local)
         export HADOOP_CONF_DIR=$ROOT/conf/local/
         ;;
@@ -24,7 +27,7 @@ case "$hadoop_conf" in
         ;;
     *)
         echo "unknown config $hadoop_conf" 1>&2
-        
+        exit 1
         ;;
 esac
 
@@ -33,13 +36,15 @@ if [[ "$1" == "" ]]; then
     exit 1
 fi
 
-CDH=cdh4.4.0
-export HADOOP_HOME=$ROOT/cdh/$CDH/hadoop-2.0.0-$CDH
+CDH=cdh5.0.0-beta-2
+export HADOOP_PREFIX=$ROOT/cdh/$CDH/hadoop-2.2.0-$CDH
+export HADOOP_HOME=$ROOT/cdh/$CDH/hadoop-2.2.0-$CDH
 export HADOOP_HDFS_HOME=$HADOOP_HOME
 export HADOOP_MAPRED_HOME=$HADOOP_HOME
 export HADOOP_YARN_HOME=$HADOOP_HOME
+export YARN_CONF_DIR=$HADOOP_YARN_HOME/conf
 export HADOOP_COMMON_HOME=$HADOOP_HOME
-export HBASE_HOME=$ROOT/cdh/$CDH/hbase-0.94.6-$CDH
+export HBASE_HOME=$ROOT/cdh/$CDH/hbase-0.96.1.1-$CDH
 export CLASSPATH=$CLASSPATH:$HADOOP_CONF_DIR
 
 export PATH=\
