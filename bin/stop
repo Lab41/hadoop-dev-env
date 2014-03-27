@@ -17,3 +17,4 @@ fi
 ./run $hadoop_conf mr-jobhistory-daemon.sh stop historyserver
 ./run $hadoop_conf stop-yarn.sh
 ./run $hadoop_conf stop-dfs.sh
+./run $hadoop_conf zkServer.sh stop

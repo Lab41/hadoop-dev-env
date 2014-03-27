@@ -12,6 +12,7 @@ HBASE=hbase-0.96.1.1-$CDH_VERSION.tar.gz
 SEARCH=search-1.0.0-$CDH_VERSION.tar.gz
 SOLR=solr-4.4.0-$CDH_VERSION.tar.gz
 SPARK=spark-0.9.0-$CDH_VERSION.tar.gz
+ZOOKEEPER=zookeeper-3.4.5-$CDH_VERSION.tar.gz
 
 if [ ! -e downloads ]; then
     mkdir -p downloads
@@ -24,7 +25,8 @@ curl -O \
     http://archive.cloudera.com/cdh$CDH_MAJOR/cdh/$CDH_MAJOR/$HBASE \
     http://archive.cloudera.com/cdh$CDH_MAJOR/cdh/$CDH_MAJOR/$SEARCH \
     http://archive.cloudera.com/cdh$CDH_MAJOR/cdh/$CDH_MAJOR/$SOLR \
-    http://archive.cloudera.com/cdh$CDH_MAJOR/cdh/$CDH_MAJOR/$SPARK
+    http://archive.cloudera.com/cdh$CDH_MAJOR/cdh/$CDH_MAJOR/$SPARK \
+    http://archive.cloudera.com/cdh$CDH_MAJOR/cdh/$CDH_MAJOR/$ZOOKEEPER \
 
 cd ..
 
@@ -36,3 +38,4 @@ tar -xvf ../../downloads/$HBASE
 tar -xvf ../../downloads/$SEARCH
 tar -xvf ../../downloads/$SOLR
 tar -xvf ../../downloads/$SPARK
+tar -xvf ../../downloads/$ZOOKEEPER

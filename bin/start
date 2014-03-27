@@ -11,7 +11,7 @@ if [[ "$hadoop_conf" == "" ]]; then
     exit 1
 fi
 
-
+./run $hadoop_conf zkServer.sh start
 ./run $hadoop_conf start-dfs.sh
 ./run $hadoop_conf start-yarn.sh
 ./run $hadoop_conf mr-jobhistory-daemon.sh start historyserver
