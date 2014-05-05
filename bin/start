@@ -14,5 +14,6 @@ fi
 ./run $hadoop_conf zkServer.sh start
 ./run $hadoop_conf start-dfs.sh
 ./run $hadoop_conf start-yarn.sh
+./run $hadoop_conf yarn-daemons.sh start proxyserver
 ./run $hadoop_conf mr-jobhistory-daemon.sh start historyserver
 ./run $hadoop_conf start-hbase.sh
