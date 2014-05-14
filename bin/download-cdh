@@ -4,15 +4,51 @@ set -e
 
 cd `dirname $0`/..
 
-CDH_MAJOR=5
-CDH_VERSION=cdh5.0.0-beta-2
+hadoop_version="$1"
+shift
 
-HADOOP=hadoop-2.2.0-$CDH_VERSION.tar.gz
-HBASE=hbase-0.96.1.1-$CDH_VERSION.tar.gz
-SEARCH=search-1.0.0-$CDH_VERSION.tar.gz
-SOLR=solr-4.4.0-$CDH_VERSION.tar.gz
-SPARK=spark-0.9.0-$CDH_VERSION.tar.gz
-ZOOKEEPER=zookeeper-3.4.5-$CDH_VERSION.tar.gz
+if [[ "$hadoop_version" == "" ]]; then
+    echo "please enter the config" 1>&2
+    exit 1
+fi
+
+case "$hadoop_version" in
+    cdh4.6.0)
+        CDH_MAJOR=4
+        CDH_VERSION=cdh4.6.0
+
+        BASE_URL=http://archive.cloudera.com/cdh$CDH_MAJOR/cdh/$CDH_MAJOR/
+        DOWNLOADS=(
+            $BASE_URL/hadoop-2.0.0-$CDH_VERSION.tar.gz
+            $BASE_URL/hbase-0.94.15-$CDH_VERSION.tar.gz
+            $BASE_URL/zookeeper-3.4.5-$CDH_VERSION.tar.gz
+        )
+
+        HADOOP_HOME=cdh/$CDH_VERSION
+        ;;
+
+    cdh5.0.0)
+        CDH_MAJOR=5
+        CDH_VERSION=cdh5.0.0
+
+        BASE_URL=http://archive.cloudera.com/cdh$CDH_MAJOR/cdh/$CDH_MAJOR/
+        DOWNLOADS=(
+            $BASE_URL/hadoop-2.2.0-$CDH_VERSION.tar.gz
+            $BASE_URL/hbase-0.96.1.1-$CDH_VERSION.tar.gz
+            $BASE_URL/search-1.0.0-$CDH_VERSION.tar.gz
+            $BASE_URL/solr-4.4.0-$CDH_VERSION.tar.gz
+            $BASE_URL/spark-0.9.0-$CDH_VERSION.tar.gz
+            $BASE_URL/zookeeper-3.4.5-$CDH_VERSION.tar.gz
+        )
+
+        HADOOP_HOME=cdh/$CDH_VERSION
+        ;;
+
+    *)
+        echo "unknown version $hadoop_version" 1>&2
+        exit 1
+        ;;
+esac
 
 if [ ! -e downloads ]; then
     mkdir -p downloads
@@ -20,22 +56,31 @@ fi
 
 cd downloads
 
-curl -O \
-    http://archive.cloudera.com/cdh$CDH_MAJOR/cdh/$CDH_MAJOR/$HADOOP \
-    http://archive.cloudera.com/cdh$CDH_MAJOR/cdh/$CDH_MAJOR/$HBASE \
-    http://archive.cloudera.com/cdh$CDH_MAJOR/cdh/$CDH_MAJOR/$SEARCH \
-    http://archive.cloudera.com/cdh$CDH_MAJOR/cdh/$CDH_MAJOR/$SOLR \
-    http://archive.cloudera.com/cdh$CDH_MAJOR/cdh/$CDH_MAJOR/$SPARK \
-    http://archive.cloudera.com/cdh$CDH_MAJOR/cdh/$CDH_MAJOR/$ZOOKEEPER \
+for download in "${DOWNLOADS[@]}"; do
+    if [ -e `basename $download` ]; then
+        echo $download exists
+    else
+        curl -O $download
+    fi
+done
 
 cd ..
 
-mkdir -p cdh/$CDH_VERSION
-cd cdh/$CDH_VERSION
+mkdir -p $HADOOP_HOME
+cd $HADOOP_HOME
 
-tar -xvf ../../downloads/$HADOOP
-tar -xvf ../../downloads/$HBASE
-tar -xvf ../../downloads/$SEARCH
-tar -xvf ../../downloads/$SOLR
-tar -xvf ../../downloads/$SPARK
-tar -xvf ../../downloads/$ZOOKEEPER
+for download in "${DOWNLOADS[@]}"; do
+    if [ -e `basename $download` ]; then
+        echo $download exists
+    else
+        gzfile="../../downloads/$download"
+        dir=`basename $gzfile | sed 's/\(.*\)\.tar\.gz/\1/'`
+        if [ -e "$dir" ]; then
+            echo "$dir exists"
+        else
+            cmd=`tar -xvf $gzfile`
+            echo "%" $cmd
+            $cmd
+        fi
+    fi
+done
