@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 set -e
 
@@ -12,42 +12,88 @@ if [[ "$hadoop_conf" == "" ]]; then
     exit 1
 fi
 
+setup_cdh() {
+    cdh_version="$1"
+    case "$cdh_version" in
+        cdh4.4.0)
+            CHECKOUT_DIR=$ROOT/cdh/$cdh_version
+            HADOOP_VERSION=hadoop-2.0.0-$cdh_version
+            HBASE_VERSION=hbase-0.94.6-$cdh_version
+
+            setup_hadoop
+            setup_hbase
+            ;;
+
+        cdh5.0.0)
+            CHECKOUT_DIR=$ROOT/cdh/$cdh_version
+            HADOOP_VERSION=hadoop-2.3.0-$cdh_version
+            HBASE_VERSION=hbase-0.96.1.1-$cdh_version
+            SOLR_VERSION=solr-4.4.0-$cdh_version
+
+            setup_hadoop
+            setup_hbase
+            ;;
+        *)
+            echo "unknown cdh version $cdh_version" 2>&1
+            exit 1
+            ;;
+    esac
+}
+
+setup_hadoop() {
+    export HADOOP_CONF_DIR=$ROOT/conf/$hadoop_conf/hadoop-conf
+    export YARN_CONF_DIR=$ROOT/conf/$hadoop_conf/yarn-conf
+
+    export HADOOP_PREFIX=$CHECKOUT_DIR/$HADOOP_VERSION
+    export HADOOP_HOME=$HADOOP_PREFIX
+
+    export PATH=$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$PATH
+    export CLASSPATH=$CLASSPATH:$HADOOP_CONF_DIR
+}
+
+setup_hbase() {
+    export HBASE_HOME=$CHECKOUT_DIR/$HBASE_VERSION
+
+    export PATH=$HBASE_HOME/bin:$HBASE_HOME/sbin:$PATH
+}
+
+setup_solr() {
+    export SOLR_ZK_ENSEMBLE="$1"
+    export SOLR_HDFS_HOME="$2"
+
+    export SOLR_HOME=$CHECKOUT_DIR/$SOLR_VERSION
+}
+
+setup_zookeeper() {
+    export ZOOKEEPER_HOME=$CHECKOUT_DIR/$ZOOKEEPER_VERSION
+
+    export PATH=$ZOOKEEPER_HOME/bin:$ZOOKEEPER_HOME/sbin:$PATH
+}
+
 case "$hadoop_conf" in
-    pseudo)
-        CDH=cdh5.0.0
-        export HADOOP_CONF_DIR=$ROOT/conf/pseudo
-        export YARN_CONF_DIR=$HADOOP_YARN_HOME/conf
-        export HADOOP_PREFIX=$ROOT/cdh/$CDH/hadoop-2.3.0-$CDH
-        export HADOOP_HOME=$ROOT/cdh/$CDH/hadoop-2.3.0-$CDH
-        ;;
     local)
-        CDH=cdh5.0.0
-        export HADOOP_CONF_DIR=$ROOT/conf/local
-        export YARN_CONF_DIR=$HADOOP_YARN_HOME/conf
-        export HADOOP_PREFIX=$ROOT/cdh/$CDH/hadoop-2.3.0-$CDH
-        export HADOOP_HOME=$ROOT/cdh/$CDH/hadoop-2.3.0-$CDH
+        setup_cdh cdh5.0.0
+        setup_zookeeper localhost:2181
+        setup_solr hdfs://localhost:8020/solr
+
         ;;
+
+    pseudo)
+        setup_cdh cdh5.0.0
+        ;;
+
     vm)
-        CDH=cdh5.0.0
-        export HADOOP_CONF_DIR=$ROOT/conf/vm
-        export YARN_CONF_DIR=$HADOOP_YARN_HOME/conf
-        export HADOOP_PREFIX=$ROOT/cdh/$CDH/hadoop-2.3.0-$CDH
-        export HADOOP_HOME=$ROOT/cdh/$CDH/hadoop-2.3.0-$CDH
+        setup_cdh cdh5.0.0
         ;;
+
     mp)
-        CDH=cdh4.4.0
-        export HADOOP_CONF_DIR=$ROOT/conf/mp/hadoop-conf
-        export YARN_CONF_DIR=$ROOT/conf/mp/yarn-conf
-        export HADOOP_PREFIX=$ROOT/cdh/$CDH/hadoop-2.0.0-$CDH
-        export HADOOP_HOME=$ROOT/cdh/$CDH/hadoop-2.0.0-$CDH
+        setup_cdh cdh4.4.0
         ;;
-    cdh5)
-        CDH=cdh5.0.0
-        export HADOOP_CONF_DIR=$ROOT/conf/cdh5
-        export YARN_CONF_DIR=$HADOOP_YARN_HOME/conf
-        export HADOOP_PREFIX=$ROOT/cdh/$CDH/hadoop-2.3.0-$CDH
-        export HADOOP_HOME=$ROOT/cdh/$CDH/hadoop-2.3.0-$CDH
+
+    fm)
+        setup_cdh cdh5.0.0
         ;;
+
     *)
         echo "unknown config $hadoop_conf" 1>&2
         exit 1
@@ -58,25 +104,5 @@ if [[ "$1" == "" ]]; then
     echo "please specify a command to run" 1>&2
     exit 1
 fi
-
-export HADOOP_HDFS_HOME=$HADOOP_HOME
-export HADOOP_MAPRED_HOME=$HADOOP_HOME
-export HADOOP_YARN_HOME=$HADOOP_HOME
-export HADOOP_COMMON_HOME=$HADOOP_HOME
-export HBASE_HOME=$ROOT/cdh/$CDH/hbase-0.96.1.1-$CDH
-export ZOOKEEPER_HOME=$ROOT/cdh/$CDH/zookeeper-3.4.5-$CDH
-export ZOOCFGDIR=$HADOOP_CONF_DIR
-export CLASSPATH=$CLASSPATH:$HADOOP_CONF_DIR
-export SOLR_ZK_ENSEMBLE=localhost:2181
-export SOLR_HDFS_HOME=hdfs://localhost:8020/solr
-export SOLR_HOME=$ROOT/cdh/$CDH/solr-4.4.0-$CDH
-
-export PATH=\
-$HADOOP_HOME/bin:\
-$HADOOP_HOME/sbin:\
-$HBASE_HOME/bin:\
-$HBASE_HOME/sbin:\
-$ZOOKEEPER_HOME/bin:\
-$PATH
 
 exec "$@"
