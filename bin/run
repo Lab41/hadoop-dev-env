@@ -1,108 +1,130 @@
-#!/bin/bash
+#!/usr/bin/env python
 
-set -e
+import sys
+import os
+import json
+import pprint
 
-ROOT=$(cd $(dirname "$0")/..; pwd)
-
-hadoop_conf="$1"
-shift
-
-if [[ "$hadoop_conf" == "" ]]; then
-    echo "please enter the config" 1>&2
-    exit 1
-fi
-
-setup_cdh() {
-    cdh_version="$1"
-    case "$cdh_version" in
-        cdh4.4.0)
-            CHECKOUT_DIR=$ROOT/cdh/$cdh_version
-            HADOOP_VERSION=hadoop-2.0.0-$cdh_version
-            HBASE_VERSION=hbase-0.94.6-$cdh_version
-
-            setup_hadoop
-            setup_hbase
-            ;;
-
-        cdh5.0.0)
-            CHECKOUT_DIR=$ROOT/cdh/$cdh_version
-            HADOOP_VERSION=hadoop-2.3.0-$cdh_version
-            HBASE_VERSION=hbase-0.96.1.1-$cdh_version
-            SOLR_VERSION=solr-4.4.0-$cdh_version
-
-            setup_hadoop
-            setup_hbase
-            ;;
-        *)
-            echo "unknown cdh version $cdh_version" 2>&1
-            exit 1
-            ;;
-    esac
+VERSION_MAP = {
+    'cdh4.4.0': {
+        'hadoop': 'hadoop-2.0.0-cdh4.4.0',
+        'hbase': 'hbase-0.94.6-cdh4.4.0',
+        'zookeeper': 'zookeeper-3.4.5-cdh4.4.0',
+    },
+    'cdh5.0.0': {
+        'cloudera search': 'cloudera-search-1.0.0-cdh5.0.0',
+        'hadoop': 'hadoop-2.3.0-cdh5.0.0',
+        'hbase': 'hbase-0.96.1.1-cdh5.0.0',
+        'solr': 'solr-4.4.0-cdh5.0.0',
+        'zookeeper': 'zookeeper-3.4.5-cdh5.0.0',
+    },
 }
 
-setup_hadoop() {
-    export HADOOP_CONF_DIR=$ROOT/conf/$hadoop_conf/hadoop-conf
-    export YARN_CONF_DIR=$ROOT/conf/$hadoop_conf/yarn-conf
+def load_configs():
+    path = os.path.expanduser(os.path.join('~', '.hadoop-clusters'))
+    if os.path.exists(path):
+        with open(path) as f:
+            return json.load(f)
+    else:
+        return {}
 
-    export HADOOP_PREFIX=$CHECKOUT_DIR/$HADOOP_VERSION
-    export HADOOP_HOME=$HADOOP_PREFIX
+def setup_hadoop(config, env):
+    env['HADOOP_CONF_DIR'] = os.path.join(config['config_dir'], 'hadoop-conf')
+    env['YARN_CONF_DIR'] = os.path.join(config['config_dir'], 'yarn-conf')
 
-    export PATH=$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$PATH
-    export CLASSPATH=$CLASSPATH:$HADOOP_CONF_DIR
-}
+    env['HADOOP_HOME'] = os.path.join(config['root_dir'], config['versions']['hadoop'])
 
-setup_hbase() {
-    export HBASE_HOME=$CHECKOUT_DIR/$HBASE_VERSION
+    env['PATH'] = [
+        os.path.join(env['HADOOP_HOME'], 'bin'),
+        os.path.join(env['HADOOP_HOME'], 'sbin'),
+    ] + env['PATH']
 
-    export PATH=$HBASE_HOME/bin:$HBASE_HOME/sbin:$PATH
-}
+def setup_hbase(config, env):
+    env['HBASE_HOME'] = home = os.path.join(config['root_dir'], config['versions']['hbase'])
 
-setup_solr() {
-    export SOLR_ZK_ENSEMBLE="$1"
-    export SOLR_HDFS_HOME="$2"
+    env['PATH'] = [
+        os.path.join(env['HBASE_HOME'], 'bin'),
+        os.path.join(env['HBASE_HOME'], 'sbin'),
+    ] + env['PATH']
 
-    export SOLR_HOME=$CHECKOUT_DIR/$SOLR_VERSION
-}
+def setup_cloudera_search(config, env):
+    env['SOLR_HOME'] = os.path.join(config['root_dir'], config['versions']['solr'])
+    env['SOLR_ZK_ENSEMBLE'] = config['zk_ensemble']
+    env['SOLR_HDFS_HOME'] = config['hdfs_home']
 
-setup_zookeeper() {
-    export ZOOKEEPER_HOME=$CHECKOUT_DIR/$ZOOKEEPER_VERSION
+    env['PATH'] = [
+        os.path.join(env['SOLR_HOME'], 'bin'),
+        os.path.join(env['SOLR_HOME'], 'sbin'),
+    ] + env['PATH']
 
-    export PATH=$ZOOKEEPER_HOME/bin:$ZOOKEEPER_HOME/sbin:$PATH
-}
+def setup_zookeeper(config, env):
+    env['ZOOKEEPER_HOME'] = os.path.join(config['root_dir'], config['versions']['zookeeper'])
 
-case "$hadoop_conf" in
-    local)
-        setup_cdh cdh5.0.0
-        setup_zookeeper localhost:2181
-        setup_solr hdfs://localhost:8020/solr
+    env['PATH'] = [
+        os.path.join(env['ZOOKEEPER_HOME'], 'bin'),
+        os.path.join(env['ZOOKEEPER_HOME'], 'sbin'),
+    ] + env['PATH']
 
-        ;;
+def main(argv):
+    if len(argv) < 3:
+        print >> sys.stderr, 'please specify a config and command'
+        return 1
 
-    pseudo)
-        setup_cdh cdh5.0.0
-        ;;
+    hadoop_config_name = argv[1]
+    command = argv[2:]
 
-    vm)
-        setup_cdh cdh5.0.0
-        ;;
+    configs = load_configs()
 
-    mp)
-        setup_cdh cdh4.4.0
-        ;;
+    try:
+        config = configs[hadoop_config_name]
+    except KeyError:
+        print >> sys.stderr, 'unknown config', hadoop_config
+        return 1
 
-    fm)
-        setup_cdh cdh5.0.0
-        ;;
+    try:
+        version = config['version']
+    except KeyError:
+        print >> sys.stderr, 'version not set in config'
+        return 1
 
-    *)
-        echo "unknown config $hadoop_conf" 1>&2
-        exit 1
-        ;;
-esac
+    try:
+        config['config_dir'] = os.path.expanduser(config['config_dir'])
+    except KeyError:
+        print >> sys.stderr, 'config_dir not set in config'
+        return 1
 
-if [[ "$1" == "" ]]; then
-    echo "please specify a command to run" 1>&2
-    exit 1
-fi
+    try:
+        config['versions'] = VERSION_MAP[version]
+    except KeyError:
+        print >> sys.stderr, 'unknown version', version
 
-exec "$@"
+    config['root_dir'] = os.path.join(os.path.dirname(argv[0]), '..', 'versions')
+
+    if not os.path.exists(config['root_dir']):
+        print >> sys.stderr, 'root directory does not exist', config['root_dir']
+        return 1
+
+    env = dict(os.environ)
+    env['PATH'] = env.get('PATH', '').split(os.pathsep)
+
+    for lib in config.get('libs', []):
+        if lib == 'hadoop':
+            setup_hadoop(config, env)
+        elif lib == 'hbase':
+            setup_hbase(config, env)
+        elif lib == 'cloudera-search':
+            setup_cloudera_search(config, env)
+        elif lib == 'zookeeper':
+            setup_zookeeper(config, env)
+        else:
+            print >> sys.stderr, 'unknown library', lib
+            return 1
+
+    env['PATH'] = os.pathsep.join(env['PATH'])
+
+    os.execvpe(command[0], command, env)
+
+    return 0
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))
