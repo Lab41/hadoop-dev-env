@@ -13,8 +13,8 @@ if [[ "$hadoop_conf" == "" ]]; then
 fi
 
 
-./run $hadoop_conf stop-hbase.sh
-./run $hadoop_conf mr-jobhistory-daemon.sh stop historyserver
-./run $hadoop_conf stop-yarn.sh
-./run $hadoop_conf stop-dfs.sh
-./run $hadoop_conf zkServer.sh stop
+./hadoop-dev-env $hadoop_conf stop-hbase.sh
+./hadoop-dev-env $hadoop_conf mr-jobhistory-daemon.sh stop historyserver
+./hadoop-dev-env $hadoop_conf stop-yarn.sh
+./hadoop-dev-env $hadoop_conf stop-dfs.sh
+./hadoop-dev-env $hadoop_conf zkServer.sh stop
