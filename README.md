@@ -9,7 +9,7 @@ Initializing CDH
 Before we can run CDH, we first need to download it:
 
 ```
-% ./bin/download-cdh
+% ./bin/download cdh4.4.0
 ```
 
 Next, initialize HDFS:

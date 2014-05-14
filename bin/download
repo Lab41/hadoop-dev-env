@@ -13,6 +13,20 @@ if [[ "$hadoop_version" == "" ]]; then
 fi
 
 case "$hadoop_version" in
+    cdh4.4.0)
+        CDH_MAJOR=4
+        CDH_VERSION=cdh4.4.0
+
+        BASE_URL=http://archive.cloudera.com/cdh$CDH_MAJOR/cdh/$CDH_MAJOR
+        DOWNLOADS=(
+            $BASE_URL/hadoop-2.0.0-$CDH_VERSION.tar.gz
+            $BASE_URL/hbase-0.94.6-$CDH_VERSION.tar.gz
+            $BASE_URL/zookeeper-3.4.5-$CDH_VERSION.tar.gz
+        )
+
+        HADOOP_HOME=cdh/$CDH_VERSION
+        ;;
+
     cdh4.6.0)
         CDH_MAJOR=4
         CDH_VERSION=cdh4.6.0
@@ -73,7 +87,7 @@ for download in "${DOWNLOADS[@]}"; do
     if [ -e `basename $download` ]; then
         echo $download exists
     else
-        gzfile="../../downloads/$download"
+        gzfile="../../downloads/`basename $download`"
         dir=`basename $gzfile | sed 's/\(.*\)\.tar\.gz/\1/'`
         if [ -e "$dir" ]; then
             echo "$dir exists"
