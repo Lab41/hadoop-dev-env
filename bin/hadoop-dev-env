@@ -172,7 +172,7 @@ def run(cluster, command):
     except KeyError:
         print >> sys.stderr, 'unknown version', version
 
-    cluster['root_dir'] = os.path.join(os.path.dirname(sys.argv[0]), '..', 'versions')
+    cluster['root_dir'] = os.path.join(CONFIG_DIR, 'versions')
 
     if not os.path.exists(cluster['root_dir']):
         print >> sys.stderr, 'root directory does not exist', cluster['root_dir']
