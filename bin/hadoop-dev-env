@@ -364,4 +364,11 @@ def main(argv):
         return 1
 
 if __name__ == '__main__':
-    sys.exit(main(sys.argv))
+    try:
+        sys.exit(main(sys.argv))
+    except HadoopDevException, e:
+        print >> sys.stderr, e
+        sys.exit(1)
+    except subprocess.CalledProcessError, e:
+        print >> sys.stderr, e
+        sys.exit(1)
