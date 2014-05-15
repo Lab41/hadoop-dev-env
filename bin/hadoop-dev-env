@@ -242,7 +242,8 @@ class HadoopLibrary(Library):
         env['YARN_CONF_DIR'] = os.path.join(self.cluster.config_dir, 'yarn-conf')
 
         env['HADOOP_PREFIX'] = self.working_dir
-        env['HADOOP_HOME'] = env['HADOOP_PREFIX']
+        env['HADOOP_HOME'] = self.working_dir
+        env['HADOOP_MAPRED_HOME'] = self.working_dir
 
     def start(self):
         env = dict(os.environ)
