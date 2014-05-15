@@ -6,6 +6,7 @@ import json
 import pprint
 import subprocess
 import optparse
+import shutil
 
 ROOT_DIR = os.path.expanduser(os.path.join('~', '.hadoop-dev-env'))
 
@@ -52,12 +53,21 @@ class UnknownLibrary(HadoopDevException):
 # ------------------------------------------------------------------------------
 
 class Cluster(object):
-    def __init__(self, cluster_name, root_dir=ROOT_DIR):
+    def __init__(self, cluster_name):
         self.cluster_name = cluster_name
-        self.root_dir = os.path.abspath(os.path.expanduser(root_dir))
+
+        # Setup a default config if one doesn't already exist.
+        if not os.path.exists(ROOT_DIR):
+            print 'creating a default ~/.hadoop-dev-env...'
+            shutil.copytree(
+                    os.path.join(
+                        os.path.dirname(os.path.realpath(__file__)),
+                        '..',
+                        'default-config'),
+                    ROOT_DIR)
 
         # load the configuration
-        with open(os.path.join(root_dir, 'config')) as f:
+        with open(os.path.join(ROOT_DIR, 'config')) as f:
             global_config = json.load(f)
 
         try:
@@ -68,11 +78,10 @@ class Cluster(object):
         # Extract our configuration
         self.local = cluster_config.get('local', False)
         self.version = cluster_config['version']
-        self.config_dir = os.path.abspath(
-                os.path.expanduser(cluster_config['config_dir']))
-
-        self.downloads_dir = os.path.join(root_dir, 'downloads')
-        self.working_dir = os.path.join(root_dir, 'versions')
+        self.config_dir = os.path.join(ROOT_DIR, 'conf', cluster_name)
+       
+        self.downloads_dir = os.path.join(ROOT_DIR, 'downloads')
+        self.working_dir = os.path.join(ROOT_DIR, 'versions')
 
         # Look up info about the distribution.
         try:
@@ -314,150 +323,6 @@ class ZookeeperLibrary(Library):
 
 # ------------------------------------------------------------------------------
 
-#def load_cluster(cluster_name):
-#    if not os.path.exists(ROOT_DIR):
-#        os.mkdir(ROOT_DIR)
-#
-#    config_path = os.path.join(ROOT_DIR, 'config')
-#    if not os.path.exists(config_path):
-#        print >> sys.stderr, 'config not setup, please create a ~/.hadoop-dev-env/config'
-#        sys.exit(1)
-#
-#    with open(config_path) as f:
-#        config = json.load(f)
-#
-#    try:
-#        cluster = config[cluster_name]
-#    except KeyError:
-#        print >> sys.stderr, 'config does not define cluster'
-#        sys.exit(1)
-#
-#    try:
-#        cluster_version = cluster['version']
-#    except KeyError:
-#        print >> sys.stderr, 'cluster does not define a version'
-#        sys.exit(1)
-#
-#    try:
-#        cluster['downloads'] = DOWNLOAD_MAP[cluster_version]
-#    except KeyError:
-#        print >> sys.stderr, 'undefined downloads for', cluster_version
-#
-#    try:
-#        cluster['versions'] = VERSION_MAP[cluster_version]
-#    except KeyError:
-#        print >> sys.stderr, 'undefined versions for', cluster_version
-#
-#    cluster['downloads_dir'] = os.path.join(ROOT_DIR, 'downloads')
-#    cluster['versions_dir'] = os.path.join(ROOT_DIR, 'versions')
-#
-#    if not os.path.exists(cluster['versions_dir']):
-#        os.mkdir(cluster['versions_dir'])
-#
-#    if not os.path.exists(cluster['downloads_dir']):
-#        os.mkdir(cluster['downloads_dir'])
-#
-#    try:
-#        cluster['config_dir'] = os.path.expanduser(cluster['config_dir'])
-#    except KeyError:
-#        print >> sys.stderr, 'config_dir not set in cluster'
-#        return 1
-#
-#    return cluster
-#
-#
-#def download(cluster, lib):
-#    version_path = os.path.join(cluster['versions_dir'], cluster['versions'][lib])
-#
-#    if not os.path.exists(version_path):
-#        print 'version does not exist', version_path
-#
-#        download_url = cluster['downloads'][lib]
-#        download_path = os.path.abspath(
-#                os.path.join(
-#                    cluster['downloads_dir'],
-#                    os.path.basename(download_url)))
-#
-#        if not os.path.exists(download_path):
-#            print 'downloading', download_url
-#            subprocess.check_call([
-#                'curl',
-#                '-O',
-#                download_url,
-#            ], cwd=cluster['downloads_dir'])
-#
-#        print 'extracting', download_path
-#        subprocess.check_call([
-#            'tar',
-#            '-xvf',
-#            download_path,
-#        ], cwd=cluster['versions_dir'])
-#
-#def setup_hadoop(cluster, env):
-#    env['HADOOP_CONF_DIR'] = os.path.join(cluster['config_dir'], 'hadoop-conf')
-#    env['YARN_CONF_DIR'] = os.path.join(cluster['config_dir'], 'yarn-conf')
-#
-#    env['HADOOP_PREFIX'] = os.path.join(cluster['versions_dir'], cluster['versions']['hadoop'])
-#    env['HADOOP_HOME'] = env['HADOOP_PREFIX']
-#
-#    env['PATH'] = [
-#        os.path.join(env['HADOOP_HOME'], 'bin'),
-#        os.path.join(env['HADOOP_HOME'], 'sbin'),
-#    ] + env['PATH']
-#
-#def setup_hbase(cluster, env):
-#    env['HBASE_HOME'] = home = os.path.join(cluster['versions_dir'], cluster['versions']['hbase'])
-#
-#    env['PATH'] = [
-#        os.path.join(env['HBASE_HOME'], 'bin'),
-#        os.path.join(env['HBASE_HOME'], 'sbin'),
-#    ] + env['PATH']
-#
-#def setup_cloudera_search(cluster, env):
-#    env['SOLR_HOME'] = os.path.join(cluster['versions_dir'], cluster['versions']['solr'])
-#    env['SOLR_ZK_ENSEMBLE'] = cluster['zk_ensemble']
-#    env['SOLR_HDFS_HOME'] = cluster['hdfs_home']
-#
-#    env['PATH'] = [
-#        os.path.join(env['SOLR_HOME'], 'bin'),
-#        os.path.join(env['SOLR_HOME'], 'sbin'),
-#    ] + env['PATH']
-#
-#def setup_zookeeper(cluster, env):
-#    env['ZOOKEEPER_HOME'] = os.path.join(cluster['versions_dir'], cluster['versions']['zookeeper'])
-#
-#    env['PATH'] = [
-#        os.path.join(env['ZOOKEEPER_HOME'], 'bin'),
-#        os.path.join(env['ZOOKEEPER_HOME'], 'sbin'),
-#    ] + env['PATH']
-#
-#def run(cluster, command):
-#    env = dict(os.environ)
-#    env['PATH'] = env.get('PATH', '').split(os.pathsep)
-#
-#    for lib in cluster.get('libs', []):
-#        if lib == 'hadoop':
-#            download(cluster, lib)
-#            setup_hadoop(cluster, env)
-#        elif lib == 'hbase':
-#            download(cluster, lib)
-#            setup_hbase(cluster, env)
-#        elif lib == 'cloudera-search':
-#            download(cluster, lib)
-#            setup_cloudera_search(cluster, env)
-#        elif lib == 'zookeeper':
-#            download(cluster, lib)
-#            setup_zookeeper(cluster, env)
-#        else:
-#            print >> sys.stderr, 'unknown library', lib
-#            return 1
-#
-#    env['PATH'] = os.pathsep.join(env['PATH'])
-#
-#    os.execvpe(command[0], command, env)
-#
-#    return 0
-
 def run(cluster, *args):
     if len(args) == 0:
         print >> sys.stderr, 'command not specified'
@@ -485,7 +350,7 @@ def main(argv):
     cluster_name = argv[2]
     argv = argv[3:]
 
-    cluster = Cluster(cluster_name, root_dir=ROOT_DIR)
+    cluster = Cluster(cluster_name)
 
     if command == 'run':
         return run(cluster, *argv)

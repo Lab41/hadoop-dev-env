@@ -1,21 +1,16 @@
-This is a couple driver scripts to set up a CDH 4.4 developer environment that
-uses YARN. It has been tested on OS X 10.8.5 with Java 10.7. It is designed to
-work with both running CDH on the local machine as well as a VM running on the
-local machine.
+This is a couple driver scripts to control a Hadoop developer environment. It
+has been tested on OS X 10.8.5, Java 10.7, and Cloudera CDH4 and CDH5. It is
+designed to work with both running Hadoop on the local machine as well as a
+remote cluster.
 
-Initializing CDH
-================
+Initializing Hadoop
+===================
 
-Before we can run CDH, we first need to download it:
-
-```
-% ./bin/download cdh4.4.0
-```
-
-Next, initialize HDFS:
+Before we can run Hadoop, we need to download and format an HDFS filesystem.
+This can be automatically done by running:
 
 ```
-% ./bin/run local hdfs namenode -format
+% ./bin/hadoop-dev-env run local-cdh5.0.0 hadoop namenode -format
 ```
 
 There's one last thing we have to do before we start the services. First we
@@ -43,33 +38,60 @@ export JAVA_HOME=$(/usr/libexec/java_home)
 
 To either `~/.bash_profile` if you `bash`, or `~/.zshenv` if you use `zsh`.
 
-Starting CDH
-============
+Starting Hadoop
+===============
 
-There is a simple helper script to start CDH:
-
-```
-% ./bin/start local
-```
-
-To confirm CDH is working correctly, run:
+All the Hadoop services can be started by running:
 
 ```
-% ./bin/run local hadoop fs -mkdir -p /user/$USER
+% ./bin/hadoop-dev-env start local-cdh5.0.0
+```
+
+To confirm Hadoop is working correctly, run:
+
+```
+% ./bin/hadoop-dev-env run local-cdh5.0.0 hadoop fs -mkdir -p /user/$USER
 % echo "hey\nthere" > test
-% ./bin/run local hadoop fs -put test
+% ./bin/hadoop-dev-env run local-cdh5.0.0 hadoop fs -put test
 % rm test
 % cd 
-% ./bin/hadoop jar \
-    cdh/cdh4.4.0/hadoop-2.0.0-cdh4.4.0/share/hadoop/mapreduce2/hadoop-mapreduce-examples-2.0.0-cdh4.4.0.jar \
+% ./bin/hadoop-dev-env run local-cdh5.0.0./bin/hadoop jar \
+    ~/versions/hadoop-2.3.0-cdh5.0.0/share/hadoop/mapreduce2/hadoop-mapreduce-examples-2.3.0-cdh5.0.0.jar \
     grep test output hey
 ```
 
-Stopping CDH
-============
+Stopping Hadoop
+===============
 
-There is also a helper script to shut down CDH:
+All the Hadoop services can be stopped by running:
 
 ```
-% ./bin/stop local
+% ./bin/hadoop-dev-env stop local-cdh5.0.0
+```
+
+Configuration
+=============
+
+Additional clusters can be setup by modifying the `~/.hadoop-dev-env/config` config file. Here is an example on how to connect to remote clusters:
+
+```
+{
+    "local-cdh5.0.0": {
+        "local": true,
+        "version": "cdh5.0.0",
+        "config_dir": "~/.hadoop-dev-env/conf/local-cdh5.0.0",
+        "libs": ["hadoop", "hbase", "zookeeper"]
+    },
+    "cluster1": {
+        "version": "cdh5.0.0",
+        "config_dir": "~/.hadoop-dev-env/conf/cluster1",
+        "libs": ["hadoop", "hbase", "zookeeper"]
+    },
+    "cluster2": {
+        "version": "cdh4.4.0",
+        "config_dir": "~/.hadoop-dev-env/conf/cluster2",
+        "libs": ["hadoop"]
+    }
+}
+
 ```

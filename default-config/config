@@ -1,0 +1,7 @@
+{
+    "local-cdh5.0.0": {
+        "local": true,
+        "version": "cdh5.0.0",
+        "libs": ["hadoop", "hbase", "zookeeper"]
+    }
+}
