@@ -5,216 +5,497 @@ import os
 import json
 import pprint
 import subprocess
+import optparse
 
-CONFIG_DIR = os.path.expanduser(os.path.join('~', '.hadoop-dev-env'))
+ROOT_DIR = os.path.expanduser(os.path.join('~', '.hadoop-dev-env'))
 
-DOWNLOAD_MAP = {
+DISTRIBUTION_MAP = {
     'cdh4.4.0': {
-        'hadoop': 'http://archive.cloudera.com/cdh4/cdh/4.4.0/hadoop-2.0.0-cdh4.4.0.tar.gz',
-        'hbase': 'http://archive.cloudera.com/cdh4/cdh/4.4.0/hbase-0.94.6-cdh4.4.0.tar.gz',
-        'zookeeper': 'http://archive.cloudera.com/cdh4/cdh/4.4.0/zookeeper-3.4.5-cdh4.4.0.tar.gz',
-    },
-    'cdh4.6.0': {
-        'hadoop': 'http://archive.cloudera.com/cdh4/cdh/4.6.0/hadoop-2.0.0-cdh4.6.0.tar.gz',
-        'hbase': 'http://archive.cloudera.com/cdh4/cdh/4.6.0/hbase-0.94.15-cdh4.6.0.tar.gz',
-        'zookeeper': 'http://archive.cloudera.com/cdh4/cdh/4.6.0/zookeeper-3.4.5-cdh4.6.0.tar.gz',
+        'download_url_prefix': 'http://archive.cloudera.com/cdh4/cdh/4.4.0',
+        'libs': {
+            'hadoop': 'hadoop-2.0.0-cdh4.4.0',
+            'hbase': 'hbase-0.94.6-cdh4.4.0',
+            'zookeeper': 'zookeeper-3.4.5-cdh4.4.0',
+        },
     },
     'cdh5.0.0': {
-        'hadoop': 'http://archive.cloudera.com/cdh5/cdh/5/hadoop-2.3.0-cdh5.0.0.tar.gz',
-        'hbase': 'http://archive.cloudera.com/cdh5/cdh/5/hbase-0.96.1.1-cdh5.0.0.tar.gz',
-        'search': 'http://archive.cloudera.com/cdh5/cdh/5/search-1.0.0-cdh5.0.0.tar.gz',
-        'solr': 'http://archive.cloudera.com/cdh5/cdh/5/solr-4.4.0-cdh5.0.0.tar.gz',
-        'spark': 'http://archive.cloudera.com/cdh5/cdh/5/spark-0.9.0-cdh5.0.0.tar.gz',
-        'zookeeper': 'http://archive.cloudera.com/cdh5/cdh/5/zookeeper-3.4.5-cdh5.0.0.tar.gz',
+        'download_url_prefix': 'http://archive.cloudera.com/cdh5/cdh/5',
+        'libs': {
+            'cloudera search': 'cloudera-search-1.0.0-cdh5.0.0',
+            'hadoop': 'hadoop-2.3.0-cdh5.0.0',
+            'hbase': 'hbase-0.96.1.1-cdh5.0.0',
+            'solr': 'solr-4.4.0-cdh5.0.0',
+            'zookeeper': 'zookeeper-3.4.5-cdh5.0.0',
+        },
     },
 }
 
-VERSION_MAP = {
-    'cdh4.4.0': {
-        'hadoop': 'hadoop-2.0.0-cdh4.4.0',
-        'hbase': 'hbase-0.94.6-cdh4.4.0',
-        'zookeeper': 'zookeeper-3.4.5-cdh4.4.0',
-    },
-    'cdh5.0.0': {
-        'cloudera search': 'cloudera-search-1.0.0-cdh5.0.0',
-        'hadoop': 'hadoop-2.3.0-cdh5.0.0',
-        'hbase': 'hbase-0.96.1.1-cdh5.0.0',
-        'solr': 'solr-4.4.0-cdh5.0.0',
-        'zookeeper': 'zookeeper-3.4.5-cdh5.0.0',
-    },
+DEPENDENCY_MAP = {
+    'hadoop': ['zookeeper'],
+    'hbase': ['hadoop', 'zookeeper'],
+    'cloudera-search': ['hadoop', 'zookeeper'],
+    'zookeeper': [],
 }
 
-def load_cluster(cluster_name):
-    if not os.path.exists(CONFIG_DIR):
-        os.mkdir(CONFIG_DIR)
+class HadoopDevException(Exception):
+    pass
 
-    config_path = os.path.join(CONFIG_DIR, 'config')
-    if not os.path.exists(config_path):
-        print >> sys.stderr, 'config not setup, please create a ~/.hadoop-dev-env/config'
-        sys.exit(1)
+class UnknownCluster(HadoopDevException):
+    pass
 
-    with open(config_path) as f:
-        config = json.load(f)
+class UnknownDistribution(HadoopDevException):
+    pass
 
-    try:
-        cluster = config[cluster_name]
-    except KeyError:
-        print >> sys.stderr, 'config does not define cluster'
-        sys.exit(1)
+class UnknownLibrary(HadoopDevException):
+    pass
 
-    try:
-        cluster_version = cluster['version']
-    except KeyError:
-        print >> sys.stderr, 'cluster does not define a version'
-        sys.exit(1)
+# ------------------------------------------------------------------------------
 
-    try:
-        cluster['downloads'] = DOWNLOAD_MAP[cluster_version]
-    except KeyError:
-        print >> sys.stderr, 'undefined downloads for', cluster_version
+class Cluster(object):
+    def __init__(self, cluster_name, root_dir=ROOT_DIR):
+        self.cluster_name = cluster_name
+        self.root_dir = os.path.abspath(os.path.expanduser(root_dir))
 
-    try:
-        cluster['versions'] = VERSION_MAP[cluster_version]
-    except KeyError:
-        print >> sys.stderr, 'undefined versions for', cluster_version
+        # load the configuration
+        with open(os.path.join(root_dir, 'config')) as f:
+            global_config = json.load(f)
 
-    cluster['downloads_dir'] = os.path.join(CONFIG_DIR, 'downloads')
-    cluster['versions_dir'] = os.path.join(CONFIG_DIR, 'versions')
+        try:
+            cluster_config = global_config[self.cluster_name]
+        except KeyError:
+            raise UnknownCluster, cluster_name
 
-    if not os.path.exists(cluster['versions_dir']):
-        os.mkdir(cluster['versions_dir'])
+        # Extract our configuration
+        self.local = cluster_config.get('local', False)
+        self.version = cluster_config['version']
+        self.config_dir = os.path.abspath(
+                os.path.expanduser(cluster_config['config_dir']))
 
-    if not os.path.exists(cluster['downloads_dir']):
-        os.mkdir(cluster['downloads_dir'])
+        self.downloads_dir = os.path.join(root_dir, 'downloads')
+        self.working_dir = os.path.join(root_dir, 'versions')
 
-    return cluster
+        # Look up info about the distribution.
+        try:
+            self.distribution = DISTRIBUTION_MAP[self.version]
+        except KeyError:
+            raise UnknownDistribution, self.version
 
+        self.download_url_prefix = self.distribution['download_url_prefix']
 
-def download(cluster, lib):
-    version_path = os.path.join(cluster['versions_dir'], cluster['versions'][lib])
+        # Extract our libraries.
+        self.libs = {}
 
-    if not os.path.exists(version_path):
-        print 'version does not exist', version_path
+        for lib_name in cluster_config['libs']:
+            try:
+                full_name = self.distribution['libs'][lib_name]
+            except KeyError:
+                raise UnknownLibrary, lib_name
 
-        download_url = cluster['downloads'][lib]
-        download_path = os.path.abspath(
-                os.path.join(
-                    cluster['downloads_dir'],
-                    os.path.basename(download_url)))
+            if lib_name == 'hadoop':
+                self.libs[lib_name] = HadoopLibrary(self, full_name)
+            elif lib_name == 'hbase':
+                self.libs[lib_name] = HBaseLibrary(self, full_name)
+            elif lib_name == 'cloudera_search':
+                self.libs[lib_name] = ClouderaSearchLibrary(self, full_name)
+            elif lib_name == 'zookeeper':
+                self.libs[lib_name] = ZookeeperLibrary(self, full_name)
+            else:
+                raise UnknownLibrary, lib_name
 
+    def execute(self, *args, **kwargs):
+        env = dict(os.environ)
+
+        for lib in self.libs.itervalues():
+            lib.setup_environment(env)
+
+        kwargs['env'] = env
+
+        if kwargs.pop('verbose', False):
+            print '% {}'.format(' '.join(args))
+
+        subprocess.check_call(list(args), **kwargs)
+
+    def _resolve_dependencies(self):
+        # we need to start hadoop first.
+        order = []
+
+        def add(lib):
+            if lib in order:
+                return
+
+            for dep_name in DEPENDENCY_MAP.get(lib.name, []):
+                try:
+                    child_lib = self.libs[dep_name]
+                except KeyError:
+                    raise HadoopDevException, 'missing dependency %s' % dep_name
+
+                add(child_lib)
+
+            order.append(lib)
+
+        for lib in self.libs.itervalues():
+            add(lib)
+
+        return order
+
+    def start(self):
+        if not self.local:
+            raise HadoopDevException, 'cannot start remote clusters'
+
+        for lib in self._resolve_dependencies():
+            lib.start()
+
+    def stop(self):
+        if not self.local:
+            raise HadoopDevException, 'cannot stop remote clusters'
+
+        for lib in reversed(self._resolve_dependencies()):
+            lib.stop()
+
+# ------------------------------------------------------------------------------
+
+class Library(object):
+    _name = None
+
+    def __init__(self, cluster, full_name):
+        self.cluster = cluster
+        self.full_name = full_name
+
+        self.working_dir = os.path.join(self.cluster.working_dir, self.full_name)
+
+    def extract_working_dir(self):
+        # Only extract tarball if we haven't already.
+        if not os.path.exists(self.working_dir):
+            download_path = self.download_tarball()
+
+            # Make sure the working directory exists.
+            if not os.path.exists(self.cluster.working_dir):
+                os.makedirs(self.cluster.working_dir)
+
+            # Extract to the working dir
+            print 'extracting', download_path
+
+            subprocess.check_call([
+                'tar',
+                '-xvf',
+                download_path,
+            ], cwd=os.path.dirname(self.working_dir))
+
+        return self.working_dir
+
+    def download_tarball(self):
+        tarball = self.full_name + '.tar.gz'
+        download_path = os.path.join(self.cluster.downloads_dir, tarball)
+
+        # Only download tarball if we haven't already.
         if not os.path.exists(download_path):
+            if not os.path.exists(self.cluster.downloads_dir):
+                os.makedirs(self.cluster.downloads_dir)
+
+            download_url = self.cluster.download_url_prefix + '/' + tarball
+
             print 'downloading', download_url
+
             subprocess.check_call([
                 'curl',
                 '-O',
                 download_url,
-            ], cwd=cluster['downloads_dir'])
+            ], cwd=self.cluster.downloads_dir)
 
-        print 'extracting', download_path
-        subprocess.check_call([
-            'tar',
-            '-xvf',
-            download_path,
-        ], cwd=cluster['versions_dir'])
+        return download_path
 
-def setup_hadoop(cluster, env):
-    env['HADOOP_CONF_DIR'] = os.path.join(cluster['config_dir'], 'hadoop-conf')
-    env['YARN_CONF_DIR'] = os.path.join(cluster['config_dir'], 'yarn-conf')
+    def setup_environment(self, env):
+        self.extract_working_dir()
 
-    env['HADOOP_HOME'] = os.path.join(cluster['root_dir'], cluster['versions']['hadoop'])
+        env['PATH'] = os.pathsep.join([
+            os.path.join(self.working_dir, 'bin'),
+            os.path.join(self.working_dir, 'sbin'),
+        ] + env['PATH'].split(os.pathsep))
 
-    env['PATH'] = [
-        os.path.join(env['HADOOP_HOME'], 'bin'),
-        os.path.join(env['HADOOP_HOME'], 'sbin'),
-    ] + env['PATH']
+    def execute(self, *args, **kwargs):
+        self.cluster.execute(*args, **kwargs)
 
-def setup_hbase(cluster, env):
-    env['HBASE_HOME'] = home = os.path.join(cluster['root_dir'], cluster['versions']['hbase'])
+    def start(self):
+        raise NotImplementedError
 
-    env['PATH'] = [
-        os.path.join(env['HBASE_HOME'], 'bin'),
-        os.path.join(env['HBASE_HOME'], 'sbin'),
-    ] + env['PATH']
+    def stop(self):
+        raise NotImplementedError
 
-def setup_cloudera_search(cluster, env):
-    env['SOLR_HOME'] = os.path.join(cluster['root_dir'], cluster['versions']['solr'])
-    env['SOLR_ZK_ENSEMBLE'] = cluster['zk_ensemble']
-    env['SOLR_HDFS_HOME'] = cluster['hdfs_home']
+# ------------------------------------------------------------------------------
 
-    env['PATH'] = [
-        os.path.join(env['SOLR_HOME'], 'bin'),
-        os.path.join(env['SOLR_HOME'], 'sbin'),
-    ] + env['PATH']
+class HadoopLibrary(Library):
+    name = 'hadoop'
 
-def setup_zookeeper(cluster, env):
-    env['ZOOKEEPER_HOME'] = os.path.join(cluster['root_dir'], cluster['versions']['zookeeper'])
+    def setup_environment(self, env):
+        super(HadoopLibrary, self).setup_environment(env)
 
-    env['PATH'] = [
-        os.path.join(env['ZOOKEEPER_HOME'], 'bin'),
-        os.path.join(env['ZOOKEEPER_HOME'], 'sbin'),
-    ] + env['PATH']
+        env['HADOOP_CONF_DIR'] = os.path.join(self.cluster.config_dir, 'hadoop-conf')
+        env['YARN_CONF_DIR'] = os.path.join(self.cluster.config_dir, 'yarn-conf')
 
-def run(cluster, command):
-    try:
-        version = cluster['version']
-    except KeyError:
-        print >> sys.stderr, 'version not set in cluster'
+        env['HADOOP_PREFIX'] = self.working_dir
+        env['HADOOP_HOME'] = env['HADOOP_PREFIX']
+
+    def start(self):
+        env = dict(os.environ)
+        self.setup_environment(env)
+
+        self.execute('start-dfs.sh', env=env)
+        self.execute('start-yarn.sh', env=env)
+        self.execute('yarn-daemons.sh', 'start', 'proxyserver', env=env)
+        self.execute('mr-jobhistory-daemon.sh', 'start', 'historyserver', env=env)
+
+    def stop(self):
+        env = dict(os.environ)
+        self.setup_environment(env)
+
+        self.execute('mr-jobhistory-daemon.sh', 'stop', 'historyserver', env=env)
+        self.execute('yarn-daemons.sh', 'stop', 'proxyserver', env=env)
+        self.execute('stop-yarn.sh', env=env)
+        self.execute('stop-dfs.sh', env=env)
+
+# ------------------------------------------------------------------------------
+
+class HBaseLibrary(Library):
+    name = 'hbase'
+
+    def setup_environment(self, env):
+        super(HBaseLibrary, self).setup_environment(env)
+
+        env['HBASE_CONF_DIR'] = os.path.join(self.cluster.config_dir, 'hbase-conf')
+        env['HBASE_HOME'] = self.working_dir
+
+    def start(self):
+        env = dict(os.environ)
+        self.setup_environment(env)
+
+        self.execute('start-hbase.sh', env=env)
+
+    def stop(self):
+        env = dict(os.environ)
+        self.setup_environment(env)
+
+        self.execute('stop-hbase.sh', env=env)
+
+# ------------------------------------------------------------------------------
+
+class ClouderaSearchLibrary(Library):
+    name = 'cloudera-search'
+
+    def setup_environment(self, env):
+        super(ClouderaSearchLibrary, self).setup_environment(env)
+
+        env['SOLR_CONF_DIR'] = os.path.join(self.cluster.config_dir, 'search-conf')
+        env['SOLR_HOME'] = self.working_dir
+        env['SOLR_ZK_ENSEMBLE'] = cluster['zk_ensemble']
+        env['SOLR_HDFS_HOME'] = cluster['hdfs_home']
+
+# ------------------------------------------------------------------------------
+
+class ZookeeperLibrary(Library):
+    name = 'zookeeper'
+
+    def setup_environment(self, env):
+        super(ZookeeperLibrary, self).setup_environment(env)
+
+        env['ZOOCFGDIR'] = os.path.join(self.cluster.config_dir, 'zookeeper-conf')
+        env['ZOOKEEPER_HOME'] = self.working_dir
+
+    def start(self):
+        env = dict(os.environ)
+        self.setup_environment(env)
+
+        self.execute('zkServer.sh', 'start', env=env)
+
+    def stop(self):
+        env = dict(os.environ)
+        self.setup_environment(env)
+
+        self.execute('zkServer.sh', 'stop', env=env)
+
+# ------------------------------------------------------------------------------
+
+#def load_cluster(cluster_name):
+#    if not os.path.exists(ROOT_DIR):
+#        os.mkdir(ROOT_DIR)
+#
+#    config_path = os.path.join(ROOT_DIR, 'config')
+#    if not os.path.exists(config_path):
+#        print >> sys.stderr, 'config not setup, please create a ~/.hadoop-dev-env/config'
+#        sys.exit(1)
+#
+#    with open(config_path) as f:
+#        config = json.load(f)
+#
+#    try:
+#        cluster = config[cluster_name]
+#    except KeyError:
+#        print >> sys.stderr, 'config does not define cluster'
+#        sys.exit(1)
+#
+#    try:
+#        cluster_version = cluster['version']
+#    except KeyError:
+#        print >> sys.stderr, 'cluster does not define a version'
+#        sys.exit(1)
+#
+#    try:
+#        cluster['downloads'] = DOWNLOAD_MAP[cluster_version]
+#    except KeyError:
+#        print >> sys.stderr, 'undefined downloads for', cluster_version
+#
+#    try:
+#        cluster['versions'] = VERSION_MAP[cluster_version]
+#    except KeyError:
+#        print >> sys.stderr, 'undefined versions for', cluster_version
+#
+#    cluster['downloads_dir'] = os.path.join(ROOT_DIR, 'downloads')
+#    cluster['versions_dir'] = os.path.join(ROOT_DIR, 'versions')
+#
+#    if not os.path.exists(cluster['versions_dir']):
+#        os.mkdir(cluster['versions_dir'])
+#
+#    if not os.path.exists(cluster['downloads_dir']):
+#        os.mkdir(cluster['downloads_dir'])
+#
+#    try:
+#        cluster['config_dir'] = os.path.expanduser(cluster['config_dir'])
+#    except KeyError:
+#        print >> sys.stderr, 'config_dir not set in cluster'
+#        return 1
+#
+#    return cluster
+#
+#
+#def download(cluster, lib):
+#    version_path = os.path.join(cluster['versions_dir'], cluster['versions'][lib])
+#
+#    if not os.path.exists(version_path):
+#        print 'version does not exist', version_path
+#
+#        download_url = cluster['downloads'][lib]
+#        download_path = os.path.abspath(
+#                os.path.join(
+#                    cluster['downloads_dir'],
+#                    os.path.basename(download_url)))
+#
+#        if not os.path.exists(download_path):
+#            print 'downloading', download_url
+#            subprocess.check_call([
+#                'curl',
+#                '-O',
+#                download_url,
+#            ], cwd=cluster['downloads_dir'])
+#
+#        print 'extracting', download_path
+#        subprocess.check_call([
+#            'tar',
+#            '-xvf',
+#            download_path,
+#        ], cwd=cluster['versions_dir'])
+#
+#def setup_hadoop(cluster, env):
+#    env['HADOOP_CONF_DIR'] = os.path.join(cluster['config_dir'], 'hadoop-conf')
+#    env['YARN_CONF_DIR'] = os.path.join(cluster['config_dir'], 'yarn-conf')
+#
+#    env['HADOOP_PREFIX'] = os.path.join(cluster['versions_dir'], cluster['versions']['hadoop'])
+#    env['HADOOP_HOME'] = env['HADOOP_PREFIX']
+#
+#    env['PATH'] = [
+#        os.path.join(env['HADOOP_HOME'], 'bin'),
+#        os.path.join(env['HADOOP_HOME'], 'sbin'),
+#    ] + env['PATH']
+#
+#def setup_hbase(cluster, env):
+#    env['HBASE_HOME'] = home = os.path.join(cluster['versions_dir'], cluster['versions']['hbase'])
+#
+#    env['PATH'] = [
+#        os.path.join(env['HBASE_HOME'], 'bin'),
+#        os.path.join(env['HBASE_HOME'], 'sbin'),
+#    ] + env['PATH']
+#
+#def setup_cloudera_search(cluster, env):
+#    env['SOLR_HOME'] = os.path.join(cluster['versions_dir'], cluster['versions']['solr'])
+#    env['SOLR_ZK_ENSEMBLE'] = cluster['zk_ensemble']
+#    env['SOLR_HDFS_HOME'] = cluster['hdfs_home']
+#
+#    env['PATH'] = [
+#        os.path.join(env['SOLR_HOME'], 'bin'),
+#        os.path.join(env['SOLR_HOME'], 'sbin'),
+#    ] + env['PATH']
+#
+#def setup_zookeeper(cluster, env):
+#    env['ZOOKEEPER_HOME'] = os.path.join(cluster['versions_dir'], cluster['versions']['zookeeper'])
+#
+#    env['PATH'] = [
+#        os.path.join(env['ZOOKEEPER_HOME'], 'bin'),
+#        os.path.join(env['ZOOKEEPER_HOME'], 'sbin'),
+#    ] + env['PATH']
+#
+#def run(cluster, command):
+#    env = dict(os.environ)
+#    env['PATH'] = env.get('PATH', '').split(os.pathsep)
+#
+#    for lib in cluster.get('libs', []):
+#        if lib == 'hadoop':
+#            download(cluster, lib)
+#            setup_hadoop(cluster, env)
+#        elif lib == 'hbase':
+#            download(cluster, lib)
+#            setup_hbase(cluster, env)
+#        elif lib == 'cloudera-search':
+#            download(cluster, lib)
+#            setup_cloudera_search(cluster, env)
+#        elif lib == 'zookeeper':
+#            download(cluster, lib)
+#            setup_zookeeper(cluster, env)
+#        else:
+#            print >> sys.stderr, 'unknown library', lib
+#            return 1
+#
+#    env['PATH'] = os.pathsep.join(env['PATH'])
+#
+#    os.execvpe(command[0], command, env)
+#
+#    return 0
+
+def run(cluster, *args):
+    if len(args) == 0:
+        print >> sys.stderr, 'command not specified'
         return 1
 
-    try:
-        cluster['config_dir'] = os.path.expanduser(cluster['config_dir'])
-    except KeyError:
-        print >> sys.stderr, 'config_dir not set in cluster'
-        return 1
+    cluster.execute(*args)
 
-    try:
-        cluster['versions'] = VERSION_MAP[version]
-    except KeyError:
-        print >> sys.stderr, 'unknown version', version
+def start(cluster, *args):
+    cluster.start()
 
-    cluster['root_dir'] = os.path.join(CONFIG_DIR, 'versions')
-
-    if not os.path.exists(cluster['root_dir']):
-        print >> sys.stderr, 'root directory does not exist', cluster['root_dir']
-        return 1
-
-    env = dict(os.environ)
-    env['PATH'] = env.get('PATH', '').split(os.pathsep)
-
-    for lib in cluster.get('libs', []):
-        if lib == 'hadoop':
-            download(cluster, lib)
-            setup_hadoop(cluster, env)
-        elif lib == 'hbase':
-            download(cluster, lib)
-            setup_hbase(cluster, env)
-        elif lib == 'cloudera-search':
-            download(cluster, lib)
-            setup_cloudera_search(cluster, env)
-        elif lib == 'zookeeper':
-            download(cluster, lib)
-            setup_zookeeper(cluster, env)
-        else:
-            print >> sys.stderr, 'unknown library', lib
-            return 1
-
-    env['PATH'] = os.pathsep.join(env['PATH'])
-
-    os.execvpe(command[0], command, env)
-
-    return 0
+def stop(cluster):
+    cluster.stop()
 
 def main(argv):
     if len(argv) < 3:
         print >> sys.stderr, 'please specify a config and command'
         return 1
 
-    cluster_name = argv[1]
-    command = argv[2:]
+    command = argv[1]
 
-    cluster = load_cluster(cluster_name)
+    if command not in ['run', 'start', 'stop']:
+        print >> sys.stderr, 'unknown command', command
+        return 1
 
-    return run(cluster, command)
+    cluster_name = argv[2]
+    argv = argv[3:]
+
+    cluster = Cluster(cluster_name, root_dir=ROOT_DIR)
+
+    if command == 'run':
+        return run(cluster, *argv)
+    elif command == 'start':
+        return start(cluster, *argv)
+    elif command == 'stop':
+        return stop(cluster, *argv)
+    else:
+        print >> sys.stderr, 'unknown command', command
+        return 1
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv))
