@@ -248,6 +248,9 @@ class HadoopLibrary(Library):
         env['HADOOP_MAPRED_HOME'] = self.working_dir
         env['HADOOP_YARN_HOME'] = self.working_dir
 
+        if self.cluster.version == 'cdh5.0.0':
+            env['CDH_MR2_HOME'] = self.working_dir
+
     def start(self):
         env = dict(os.environ)
         self.setup_environment(env)
