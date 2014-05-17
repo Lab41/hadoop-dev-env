@@ -12,7 +12,7 @@ ROOT_DIR = os.path.expanduser(os.path.join('~', '.hadoop-dev-env'))
 
 DISTRIBUTION_MAP = {
     'cdh4.4.0': {
-        'download_url_prefix': 'http://archive.cloudera.com/cdh4/cdh/4.4.0',
+        'download_url_prefix': 'http://archive.cloudera.com/cdh4/cdh/4',
         'libs': {
             'hadoop': 'hadoop-2.0.0-cdh4.4.0',
             'hbase': 'hbase-0.94.6-cdh4.4.0',
