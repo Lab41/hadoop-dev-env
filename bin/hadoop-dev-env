@@ -243,7 +243,10 @@ class HadoopLibrary(Library):
 
         env['HADOOP_PREFIX'] = self.working_dir
         env['HADOOP_HOME'] = self.working_dir
+        env['HADOOP_COMMON_HOME'] = self.working_dir
+        env['HADOOP_HDFS_HOME'] = self.working_dir
         env['HADOOP_MAPRED_HOME'] = self.working_dir
+        env['HADOOP_YARN_HOME'] = self.working_dir
 
     def start(self):
         env = dict(os.environ)
