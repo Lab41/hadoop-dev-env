@@ -42,13 +42,16 @@ class HadoopDevException(Exception):
     pass
 
 class UnknownCluster(HadoopDevException):
-    pass
+    def __str__(self):
+        return 'unknown cluster: ' + self.message
 
 class UnknownDistribution(HadoopDevException):
-    pass
+    def __str__(self):
+        return 'unknown distribution: ' + self.message
 
 class UnknownLibrary(HadoopDevException):
-    pass
+    def __str__(self):
+        return 'unknown library: ' + self.message
 
 # ------------------------------------------------------------------------------
 
